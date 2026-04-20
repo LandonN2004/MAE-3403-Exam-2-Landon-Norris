@@ -1,4 +1,5 @@
 #region imports
+import os
 from X2Q2_SP24 import doPlot, simulate
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtGui as qtg
@@ -8,40 +9,24 @@ from matplotlib.figure import Figure
 #endregion
 
 #region RLC circuit classes (MVC)
-class circuitModel:
+class circuitModel():
     def __init__(self):
-        self.L = 20.0
-        self.R = 10.0
-        self.C = 0.05
-        self.A = 20.0
-        self.f = 20.0
-        self.p = 0.0
-        self.t = 10.0
-        self.pts = 500.0
-        self.results = None
+        self.nodes = []
+        self.resistors = []
+        self.capacitors = []
+        self.inductors = []
+        self.voltageSources = []
+        self.wires = []
 
 
-class circuitView:
+class circuitView():
     def __init__(self, dw=None):
-        self.layout_VertMain = None
-        self.layout_VertInput = None
-        self.form = None
-        self.figure = None
-        self.canvas = None
-        self.ax = None
-        self.toolbar = None
-        self.image_label = None
-        self.pixMap = None
-
         if dw is not None:
             self.setDisplayWidgets(dw)
             self.setupImageLabel()
             self.setupPlot()
 
     def setDisplayWidgets(self, dw=None):
-        """
-        Unpack display widgets passed in from main window.
-        """
         if dw is not None:
             self.layout_VertMain, self.layout_VertInput, self.form = dw
 
@@ -49,95 +34,72 @@ class circuitView:
         """
         Displays picture of circuit from Circuit1.png in a label widget.
         """
-        self.pixMap = qtg.QPixmap()
-        self.pixMap.load("Circuit1.png")
+        image_names = ["Circuit1.png", "Circuit1(4).png"]
+        image_path = None
+        base_dir = os.path.dirname(os.path.abspath(__file__))
 
-        self.image_label = qtw.QLabel(self.form)
+        for name in image_names:
+            candidate = os.path.join(base_dir, name)
+            if os.path.exists(candidate):
+                image_path = candidate
+                break
+
+        self.pixMap = qtg.QPixmap()
+        if image_path is not None:
+            self.pixMap.load(image_path)
+
+        self.image_label = qtw.QLabel()
         self.image_label.setPixmap(self.pixMap)
-        self.image_label.setScaledContents(False)
+        self.image_label.setScaledContents(True)
+        self.image_label.setMinimumHeight(220)
         self.layout_VertInput.addWidget(self.image_label)
 
     def setupPlot(self):
         """
         Create the figure, canvas, axes and toolbar objects and place them on GUI.
         """
-        self.figure = Figure(figsize=(8, 6), tight_layout=True, frameon=True)
+        self.figure = Figure(figsize=(8, 8), tight_layout=True, frameon=True, facecolor='none')
         self.canvas = FigureCanvasQTAgg(self.figure)
-        self.ax = self.figure.add_subplot(111)
+        self.ax = self.figure.add_subplot()
         self.toolbar = NavigationToolbar2QT(self.canvas, self.form)
-
         self.layout_VertMain.addWidget(self.toolbar)
         self.layout_VertMain.addWidget(self.canvas)
 
     def doPlot(self, args):
-        """
-        Redraw the embedded matplotlib plot.
-        """
-        self.figure.clear()
-        self.ax = self.figure.add_subplot(111)
+        self.canvas.figure.clear()
+        self.ax = self.figure.add_subplot()
         doPlot(args, ax=self.ax)
         self.canvas.draw()
 
 
-class circuitController:
+class circuitController():
     def __init__(self, args):
         """
-        Controller for the circuit simulator.
-        :param args: tuple(inputWidgets, displayWidgets)
+        This is the class for a circuitController. It has a model and view for the circuit.
+        :param args: a tuple with input widgets and display widgets
         """
         self.inputWidgets, self.displayWidgets = args
 
-        (
-            self.le_Inductance,
-            self.le_Resistance,
-            self.le_Capacitence,
-            self.le_Amplitude,
-            self.le_Freq,
-            self.le_Phase,
-            self.le_simTime,
-            self.le_simPts
-        ) = self.inputWidgets
+        # unpack the input widgets
+        (self.le_L, self.le_R, self.le_C, self.le_A,
+         self.le_f, self.le_p, self.le_t, self.le_pts) = self.inputWidgets
 
         self.Model = circuitModel()
         self.View = circuitView(dw=self.displayWidgets)
 
     def calculate(self):
         """
-        Simulate the circuit and update the plot.
+        Simulates the circuit by calling functions from X2Q2_SP24.
         """
-        try:
-            L = float(self.le_Inductance.text())
-            R = float(self.le_Resistance.text())
-            C = float(self.le_Capacitence.text())
-            A = float(self.le_Amplitude.text())
-            f = float(self.le_Freq.text())
-            p = float(self.le_Phase.text())
-            t = float(self.le_simTime.text())
-            pts = int(float(self.le_simPts.text()))
-        except ValueError:
-            qtw.QMessageBox.warning(self.View.form, "Input Error", "Please enter valid numeric inputs.")
-            return
+        L = float(self.le_L.text())
+        R = float(self.le_R.text())
+        C = float(self.le_C.text())
+        A = float(self.le_A.text())
+        f = float(self.le_f.text())
+        p = float(self.le_p.text())
+        t = float(self.le_t.text())
+        pts = float(self.le_pts.text())
 
-        self.Model.L = L
-        self.Model.R = R
-        self.Model.C = C
-        self.Model.A = A
-        self.Model.f = f
-        self.Model.p = p
-        self.Model.t = t
-        self.Model.pts = pts
-
-        self.Model.results = simulate(
-            L=L,
-            R=R,
-            C=C,
-            A=A,
-            f=f,
-            p=p,
-            t=t,
-            pts=pts
-        )
-
-        self.View.doPlot((R, C, self.Model.results.t, self.Model.results))
-
+        I = simulate(L=L, R=R, C=C, A=A, f=f, p=p, t=t, pts=pts)
+        self.View.doPlot((R, I.t, I))
 #endregion
