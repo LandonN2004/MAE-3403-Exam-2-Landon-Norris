@@ -1,6 +1,3 @@
-#Landon Norris
-#MAE 3403
-#Exam 2
 #region imports
 from X2Q2_SP24 import doPlot, simulate
 from PyQt5 import QtWidgets as qtw
@@ -10,54 +7,84 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib.figure import Figure
 #endregion
 
-
 #region RLC circuit classes (MVC)
-class circuitModel():
+class circuitModel:
     def __init__(self):
-        self.nodes = []
-        self.resistors = []
-        self.capacitors = []
-        self.inductors = []
-        self.voltageSources = []
-        self.wires = []
+        self.L = 20.0
+        self.R = 10.0
+        self.C = 0.05
+        self.A = 20.0
+        self.f = 20.0
+        self.p = 0.0
+        self.t = 10.0
+        self.pts = 500.0
+        self.results = None
 
 
-class circuitView():
+class circuitView:
     def __init__(self, dw=None):
+        self.layout_VertMain = None
+        self.layout_VertInput = None
+        self.form = None
+        self.figure = None
+        self.canvas = None
+        self.ax = None
+        self.toolbar = None
+        self.image_label = None
+        self.pixMap = None
+
         if dw is not None:
             self.setDisplayWidgets(dw)
             self.setupImageLabel()
             self.setupPlot()
 
     def setDisplayWidgets(self, dw=None):
+        """
+        Unpack display widgets passed in from main window.
+        """
         if dw is not None:
             self.layout_VertMain, self.layout_VertInput, self.form = dw
 
     def setupImageLabel(self):
+        """
+        Displays picture of circuit from Circuit1.png in a label widget.
+        """
         self.pixMap = qtg.QPixmap()
         self.pixMap.load("Circuit1.png")
-        self.image_label = qtw.QLabel()
+
+        self.image_label = qtw.QLabel(self.form)
         self.image_label.setPixmap(self.pixMap)
         self.image_label.setScaledContents(False)
         self.layout_VertInput.addWidget(self.image_label)
 
     def setupPlot(self):
-        self.figure = Figure(figsize=(8, 6), tight_layout=True, frameon=True, facecolor='none')
+        """
+        Create the figure, canvas, axes and toolbar objects and place them on GUI.
+        """
+        self.figure = Figure(figsize=(8, 6), tight_layout=True, frameon=True)
         self.canvas = FigureCanvasQTAgg(self.figure)
-        self.ax = self.figure.add_subplot()
+        self.ax = self.figure.add_subplot(111)
         self.toolbar = NavigationToolbar2QT(self.canvas, self.form)
+
         self.layout_VertMain.addWidget(self.toolbar)
         self.layout_VertMain.addWidget(self.canvas)
 
     def doPlot(self, args):
+        """
+        Redraw the embedded matplotlib plot.
+        """
         self.figure.clear()
-        self.ax = self.figure.add_subplot()
+        self.ax = self.figure.add_subplot(111)
         doPlot(args, ax=self.ax)
         self.canvas.draw()
 
 
-class circuitController():
+class circuitController:
     def __init__(self, args):
+        """
+        Controller for the circuit simulator.
+        :param args: tuple(inputWidgets, displayWidgets)
+        """
         self.inputWidgets, self.displayWidgets = args
 
         (
@@ -75,16 +102,42 @@ class circuitController():
         self.View = circuitView(dw=self.displayWidgets)
 
     def calculate(self):
-        L = float(self.le_Inductance.text())
-        R = float(self.le_Resistance.text())
-        C = float(self.le_Capacitence.text())
-        A = float(self.le_Amplitude.text())
-        f = float(self.le_Freq.text())
-        p = float(self.le_Phase.text())
-        t = float(self.le_simTime.text())
-        pts = int(float(self.le_simPts.text()))
+        """
+        Simulate the circuit and update the plot.
+        """
+        try:
+            L = float(self.le_Inductance.text())
+            R = float(self.le_Resistance.text())
+            C = float(self.le_Capacitence.text())
+            A = float(self.le_Amplitude.text())
+            f = float(self.le_Freq.text())
+            p = float(self.le_Phase.text())
+            t = float(self.le_simTime.text())
+            pts = int(float(self.le_simPts.text()))
+        except ValueError:
+            qtw.QMessageBox.warning(self.View.form, "Input Error", "Please enter valid numeric inputs.")
+            return
 
-        I = simulate(L=L, R=R, C=C, A=A, f=f, p=p, t=t, pts=pts)
-        self.View.doPlot((R, I.t, I))
+        self.Model.L = L
+        self.Model.R = R
+        self.Model.C = C
+        self.Model.A = A
+        self.Model.f = f
+        self.Model.p = p
+        self.Model.t = t
+        self.Model.pts = pts
+
+        self.Model.results = simulate(
+            L=L,
+            R=R,
+            C=C,
+            A=A,
+            f=f,
+            p=p,
+            t=t,
+            pts=pts
+        )
+
+        self.View.doPlot((R, C, self.Model.results.t, self.Model.results))
 
 #endregion
