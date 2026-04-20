@@ -1,16 +1,22 @@
-#region imports
-import os
+#Landon Norris
+#MAE 3403
+#Exam 2 Problem 2
+# region imports
 from X2Q2_SP24 import doPlot, simulate
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtGui as qtg
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+from PyQt5 import QtCore as qtc
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
-#endregion
+# endregion
 
-#region RLC circuit classes (MVC)
-class circuitModel():
+
+# region RLC circuit classes (MVC)
+class circuitModel:
     def __init__(self):
+        """
+        Store circuit-related collections.
+        """
         self.nodes = []
         self.resistors = []
         self.capacitors = []
@@ -19,87 +25,124 @@ class circuitModel():
         self.wires = []
 
 
-class circuitView():
+class circuitView:
     def __init__(self, dw=None):
-        if dw is not None:
-            self.setDisplayWidgets(dw)
-            self.setupImageLabel()
-            self.setupPlot()
-
-    def setDisplayWidgets(self, dw=None):
-        if dw is not None:
-            self.layout_VertMain, self.layout_VertInput, self.form = dw
-
-    def setupImageLabel(self):
         """
-        Displays picture of circuit from Circuit1.png in a label widget.
+        Build the visual portion of the application.
+        :param dw: tuple containing display widgets
         """
-        image_names = ["Circuit1.png", "Circuit1(4).png"]
-        image_path = None
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.layout_VertMain = None
+        self.layout_VertInput = None
+        self.form = None
+        self.figure = None
+        self.canvas = None
+        self.ax = None
+        self.toolbar = None
+        self.image_label = None
 
-        for name in image_names:
-            candidate = os.path.join(base_dir, name)
-            if os.path.exists(candidate):
-                image_path = candidate
-                break
+        if dw is not None:
+            self.assignDisplayWidgets(dw)
+            self.buildImageWidget()
+            self.buildPlotWidget()
 
-        self.pixMap = qtg.QPixmap()
-        if image_path is not None:
-            self.pixMap.load(image_path)
+    def assignDisplayWidgets(self, dw):
+        """
+        Save references to the GUI display widgets.
+        :param dw: (layout_VertMain, layout_VertInput, form)
+        """
+        self.layout_VertMain, self.layout_VertInput, self.form = dw
 
+    def buildImageWidget(self):
+        """
+        Add the circuit image to the input side of the GUI.
+        """
+        image = qtg.QPixmap("Circuit1.jpg")
         self.image_label = qtw.QLabel()
-        self.image_label.setPixmap(self.pixMap)
-        self.image_label.setScaledContents(True)
-        self.image_label.setMinimumHeight(220)
+        self.image_label.setAlignment(qtc.Qt.AlignCenter)
+        self.image_label.setPixmap(image)
         self.layout_VertInput.addWidget(self.image_label)
 
-    def setupPlot(self):
+    def buildPlotWidget(self):
         """
-        Create the figure, canvas, axes and toolbar objects and place them on GUI.
+        Create the matplotlib objects used for plotting.
         """
-        self.figure = Figure(figsize=(8, 8), tight_layout=True, frameon=True, facecolor='none')
+        self.figure = Figure(figsize=(8, 8), tight_layout=True)
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.ax = self.figure.add_subplot()
         self.toolbar = NavigationToolbar2QT(self.canvas, self.form)
+
         self.layout_VertMain.addWidget(self.toolbar)
         self.layout_VertMain.addWidget(self.canvas)
 
-    def doPlot(self, args):
-        self.canvas.figure.clear()
+    def doPlot(self, plotArgs):
+        """
+        Refresh the graph shown on the GUI.
+        :param plotArgs: (R, tList, I)
+        """
+        self.figure.clear()
         self.ax = self.figure.add_subplot()
-        doPlot(args, ax=self.ax)
+        doPlot(plotArgs, ax=self.ax)
         self.canvas.draw()
 
 
-class circuitController():
+class circuitController:
     def __init__(self, args):
         """
-        This is the class for a circuitController. It has a model and view for the circuit.
-        :param args: a tuple with input widgets and display widgets
+        Coordinate the model, view, and GUI inputs.
+        :param args: (inputWidgets, displayWidgets)
         """
         self.inputWidgets, self.displayWidgets = args
-
-        # unpack the input widgets
-        (self.le_L, self.le_R, self.le_C, self.le_A,
-         self.le_f, self.le_p, self.le_t, self.le_pts) = self.inputWidgets
+        self._storeInputReferences()
 
         self.Model = circuitModel()
-        self.View = circuitView(dw=self.displayWidgets)
+        self.View = circuitView(self.displayWidgets)
+
+    def _storeInputReferences(self):
+        """
+        Unpack the line edit widgets used for simulation inputs.
+        """
+        (
+            self.le_Inductance,
+            self.le_Resistance,
+            self.le_Capacitence,
+            self.le_Amplitude,
+            self.le_Freq,
+            self.le_Phase,
+            self.le_simTime,
+            self.le_simPts
+        ) = self.inputWidgets
+
+    def _getValues(self):
+        """
+        Read values from the GUI and return them in a dictionary.
+        """
+        return {
+            "L": float(self.le_Inductance.text()),
+            "R": float(self.le_Resistance.text()),
+            "C": float(self.le_Capacitence.text()),
+            "A": float(self.le_Amplitude.text()),
+            "f": float(self.le_Freq.text()),
+            "p": float(self.le_Phase.text()),
+            "t": float(self.le_simTime.text()),
+            "pts": float(self.le_simPts.text())
+        }
 
     def calculate(self):
         """
-        Simulates the circuit by calling functions from X2Q2_SP24.
+        Run the circuit simulation and display the results.
         """
-        L = float(self.le_L.text())
-        R = float(self.le_R.text())
-        C = float(self.le_C.text())
-        A = float(self.le_A.text())
-        f = float(self.le_f.text())
-        p = float(self.le_p.text())
-        t = float(self.le_t.text())
-        pts = float(self.le_pts.text())
+        values = self._getValues()
 
-        I = simulate(L=L, R=R, C=C, A=A, f=f, p=p, t=t, pts=pts)
-        self.View.doPlot((R, I.t, I))
-#endregion
+        results = simulate(
+            L=values["L"],
+            R=values["R"],
+            C=values["C"],
+            A=values["A"],
+            f=values["f"],
+            p=values["p"],
+            t=values["t"],
+            pts=values["pts"]
+        )
+
+        self.View.doPlot((values["R"], results.t, results))
+# endregion
